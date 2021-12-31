@@ -6,6 +6,7 @@ before:
     # You may remove this if you don't use go modules.
     - go mod tidy
     - go mod download
+    - go build
 builds:
   - env:
       - CGO_ENABLED=0
