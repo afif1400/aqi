@@ -86,18 +86,19 @@ func getAqi(cmd *cobra.Command, args []string) {
 	latitude = cmd.Flag("latitude").Value.String()
 	longitude = cmd.Flag("longitude").Value.String()
 
-	var url string
+	baseurl := "https://aqiproxy.herokuapp.com/api?"
+	var requrl string
 	if city != "" && postal == "" && country == "" && latitude == "" && longitude == "" {
-		url = "http://localhost:3000/api?city=" + city
+		requrl = baseurl + "city=" + city
 	} else if postal != "" && country != "" && latitude == "" && longitude == "" {
-		url = "http://localhost:3000/api?postal=" + postal + "&country=" + country
+		requrl = baseurl + "postal=" + postal + "&country=" + country
 	} else if latitude != "" && longitude != "" {
-		url = "http://localhost:3000/api?lat=" + latitude + "&lng=" + longitude
+		requrl = baseurl + "lat=" + latitude + "&lng=" + longitude
 	} else {
 		log.Fatal("please specify the location by using any of the following flags: --city, --postal, --country, --latitude, --longitude")
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", requrl, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,35 +113,43 @@ func getAqi(cmd *cobra.Command, args []string) {
 			log.Fatalf("error occured: %v", err)
 		}
 	}(res.Body)
+	if res.StatusCode == 200 {
+		body, _ := ioutil.ReadAll(res.Body)
 
-	body, _ := ioutil.ReadAll(res.Body)
-
-	aqi := ApiResponse{}
-	err = json.Unmarshal(body, &aqi)
-	if err != nil {
-		log.Fatalf("unable to unmarshell the response : %v", err)
-	}
-
-	if len(aqi.Stations) == 0 {
-		log.Fatal("no stations found")
-	}
-
-	for _, station := range aqi.Stations {
-		aqi := Aqi{
-			City:      station.City,
-			Place:     station.Place,
-			State:     station.State,
-			UpdatedAt: station.UpdatedAt,
-			AQI:       station.AQI,
-			AqiInfo:   station.AqiInfo,
-		}
-		json, err := json.Marshal(aqi)
+		aqi := ApiResponse{}
+		err = json.Unmarshal(body, &aqi)
 		if err != nil {
-			log.Fatalf("unable to marshall the response : %v", err)
+			log.Fatalf("unable to unmarshell the response : %v", err)
 		}
-		log.Println(string(json))
-		dataUi(aqi.AQI, station)
+
+		if len(aqi.Stations) == 0 {
+			log.Fatal("no stations found")
+		}
+
+		for _, station := range aqi.Stations {
+			aqi := Aqi{
+				City:      station.City,
+				Place:     station.Place,
+				State:     station.State,
+				UpdatedAt: station.UpdatedAt,
+				AQI:       station.AQI,
+				AqiInfo:   station.AqiInfo,
+			}
+			_, err := json.Marshal(aqi)
+			if err != nil {
+				log.Fatalf("unable to marshall the response : %v", err)
+			}
+			dataUi(aqi.AQI, station)
+		}
+	} else {
+		body, _ := ioutil.ReadAll(res.Body)
+		if err != nil {
+			log.Fatalf("unable to unmarshell the response : %v", err)
+		}
+
+		log.Fatal(string(body))
 	}
+
 }
 
 func dataUi(aqi float64, station Station) {
